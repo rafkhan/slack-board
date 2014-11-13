@@ -5,7 +5,9 @@ window.onload = function() {
 
   var h1 = document.getElementById('message');
 
-  var sock = new WebSocket('ws://127.0.0.1:8080/websocket');
+  var host = window.location.host;
+
+  var sock = new WebSocket('ws://' + host + '/websocket');
   sock.onopen = function() {
     setTimeout(function() {
       sock.send('asd');
