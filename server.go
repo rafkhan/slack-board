@@ -39,6 +39,9 @@ func readWriteSocket(ch chan []byte, conn *websocket.Conn) {
 
 func websocketHandler(ch chan []byte) func(w http.ResponseWriter, r *http.Request) {
   return func(w http.ResponseWriter, r *http.Request) {
+
+    log.Println("Connected");
+
     conn, err := upgrader.Upgrade(w, r, nil);
 
     if err != nil {
