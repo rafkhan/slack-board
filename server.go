@@ -83,6 +83,10 @@ func slackHandler(ch chan []byte) func(w http.ResponseWriter, r *http.Request){
     }
 
     resp := text[1:];
+
+    log.Println(body);
+    log.Println(resp);
+
     ch <- []byte(resp);
   };
 }
