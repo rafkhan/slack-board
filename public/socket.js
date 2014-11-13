@@ -1,14 +1,18 @@
-/*global window, WebSocket, console*/
+/*global window, WebSocket, document*/
 
 window.onload = function() {
   'use strict';
 
-  var sock = new WebSocket('ws://127.0.0.1:8080/foo');
+  var h1 = document.getElementById('message');
+
+  var sock = new WebSocket('ws://127.0.0.1:8080/websocket');
   sock.onopen = function() {
-    sock.send('asd');
+    setTimeout(function() {
+      sock.send('asd');
+    }, 500);
   };
 
   sock.onmessage = function(e) {
-    console.log(e.data);
+    h1.innerHTML = e.data;
   };
 };

@@ -3,7 +3,9 @@ package main;
 import (
   "io"
   "log"
+  "net/url"
   "net/http"
+  "io/ioutil"
   websocket "github.com/gorilla/websocket"
 )
 
@@ -46,12 +48,49 @@ func websocketHandler(w http.ResponseWriter, r *http.Request) {
   go readWriteSocket(conn);
 }
 
+func getBody(r *http.Request) string {
+  body, err := ioutil.ReadAll(r.Body);
+
+  if err != nil {
+    return "";
+  }
+
+  return string(body);
+}
+
+func IsSlackbot(v url.Values) bool {
+  return v["user_id"][0] == "USLACKBOT";
+}
+
+func HasTrigger(text string) bool {
+  return text[0] == '~';
+}
+
+func slackHandler(w http.ResponseWriter, r *http.Request) {
+  body := getBody(r);
+  vals, err := url.ParseQuery(body);
+
+  if err != nil || IsSlackbot(vals) {
+    return;
+  }
+
+  text := vals["text"][0];
+  if !HasTrigger(text) {
+    return;
+  }
+
+  resp := text[1:];
+
+  w.Write([]byte(resp));
+}
+
 func main() {
   http.HandleFunc("/public/", func(w http.ResponseWriter, r *http.Request) {
     http.ServeFile(w, r, r.URL.Path[1:]);
   });
 
-  http.HandleFunc("/foo", websocketHandler);
+  http.HandleFunc("/websocket", websocketHandler);
+  http.HandleFunc("/slackmessage", slackHandler);
 
   log.Println("Starting on 8080");
   log.Fatal(http.ListenAndServe(":8080", nil))
