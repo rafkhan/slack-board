@@ -3,6 +3,7 @@ package main;
 import (
   "io"
   "log"
+  "bytes"
   "net/url"
   "net/http"
   "io/ioutil"
@@ -15,14 +16,13 @@ var upgrader = websocket.Upgrader {
   CheckOrigin: func(r *http.Request) bool { return true },
 }
 
-func readWriteSocket(conn *websocket.Conn) {
+func readWriteSocket(ch chan []byte, conn *websocket.Conn) {
   for {
-    messageType, r, err := conn.NextReader()
-    if err != nil {
-      return
-    }
+    // wait on channel
+    data := <-ch;
+    r := bytes.NewReader(data);
 
-    w, err := conn.NextWriter(messageType)
+    w, err := conn.NextWriter(1); //not sure why 1
     if err != nil {
       log.Println(err)
     }
@@ -37,15 +37,17 @@ func readWriteSocket(conn *websocket.Conn) {
   }
 }
 
-func websocketHandler(w http.ResponseWriter, r *http.Request) {
-  conn, err := upgrader.Upgrade(w, r, nil)
+func websocketHandler(ch chan []byte) func(w http.ResponseWriter, r *http.Request) {
+  return func(w http.ResponseWriter, r *http.Request) {
+    conn, err := upgrader.Upgrade(w, r, nil);
 
-  if err != nil {
-    log.Println(err);
-    return;
-  }
+    if err != nil {
+      log.Println(err);
+      return;
+    }
 
-  go readWriteSocket(conn);
+    go readWriteSocket(ch, conn);
+  };
 }
 
 func getBody(r *http.Request) string {
@@ -66,22 +68,23 @@ func HasTrigger(text string) bool {
   return text[0] == '~';
 }
 
-func slackHandler(w http.ResponseWriter, r *http.Request) {
-  body := getBody(r);
-  vals, err := url.ParseQuery(body);
+func slackHandler(ch chan []byte) func(w http.ResponseWriter, r *http.Request){
+  return func(w http.ResponseWriter, r *http.Request) {
+    body := getBody(r);
+    vals, err := url.ParseQuery(body);
 
-  if err != nil || IsSlackbot(vals) {
-    return;
-  }
+    if err != nil || IsSlackbot(vals) {
+      return;
+    }
 
-  text := vals["text"][0];
-  if !HasTrigger(text) {
-    return;
-  }
+    text := vals["text"][0];
+    if !HasTrigger(text) {
+      return;
+    }
 
-  resp := text[1:];
-
-  w.Write([]byte(resp));
+    resp := text[1:];
+    ch <- []byte(resp);
+  };
 }
 
 func main() {
@@ -89,8 +92,10 @@ func main() {
     http.ServeFile(w, r, r.URL.Path[1:]);
   });
 
-  http.HandleFunc("/websocket", websocketHandler);
-  http.HandleFunc("/slackmessage", slackHandler);
+  ch := make(chan []byte);
+
+  http.HandleFunc("/websocket", websocketHandler(ch));
+  http.HandleFunc("/slackmessage", slackHandler(ch));
 
   log.Println("Starting on 8080");
   log.Fatal(http.ListenAndServe(":8080", nil))
